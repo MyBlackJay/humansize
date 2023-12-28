@@ -197,3 +197,62 @@ func TestBytesToSize(t *testing.T) {
 		}
 	}
 }
+
+func TestGetSize(t *testing.T) {
+	tests := []struct {
+		input   ReadableSize
+		measure string
+		result  float64
+		isError bool
+	}{
+		{
+			input:   ReadableSize{input: "2048.5MB", measure: 1 << 20, compiled: new(big.Float).SetFloat64(2048.5 * float64(1<<20))},
+			measure: "MB",
+			result:  2048.5,
+			isError: false,
+		},
+		{
+			input:   ReadableSize{input: "2048MB", measure: 1 << 20, compiled: new(big.Float).SetFloat64(2048 * float64(1<<20))},
+			measure: "GB",
+			result:  2,
+			isError: false,
+		},
+		{
+			input:   ReadableSize{input: "100MB", measure: 1 << 20, compiled: new(big.Float).SetFloat64(100 * float64(1<<20))},
+			measure: "kib",
+			result:  100 * float64(1<<10),
+			isError: false,
+		},
+		{
+			input:   ReadableSize{input: "100MB", measure: 1 << 20, compiled: new(big.Float).SetFloat64(100 * float64(1<<20))},
+			measure: "bytes",
+			result:  100 * float64(1<<20),
+			isError: false,
+		},
+		{
+			input:   ReadableSize{input: "100MB", measure: 1 << 10, compiled: new(big.Float)},
+			measure: "kir",
+			result:  100 * float64(1<<10),
+			isError: true,
+		},
+	}
+
+	for i, v := range tests {
+		res, err := v.input.GetCompiledInMeasure(v.measure)
+
+		switch {
+		case err != nil && !v.isError:
+			t.Errorf("Test %d (input: %+v) failed. Error was not expected.", i, v.input)
+		case v.isError && err == nil:
+			t.Errorf("Test %d (input: %+v) failed. The error was expected", i, v.input)
+		case res == v.result || (v.isError && err != nil):
+			t.Logf("Test %d (input: %+v) completed successfully", i, v.input)
+		case res != v.result:
+			t.Errorf(
+				"Test %d (input: %+v) failed. Expected: %f. Result: %f",
+				i, v.input, v.result, res,
+			)
+
+		}
+	}
+}

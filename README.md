@@ -49,19 +49,20 @@ func validateMeasureAndPrint() {
 	fmt.Println(humansize.ValidateMeasure(measure))
 }
 
-func TurnBytesIntoToSizeAndPrint() {
+func TurnBytesIntoSizeAndPrint() {
 	size := 2.596 * float64(1<<60)
 	if res, err := humansize.BytesToSize(size, 10); err == nil {
 		fmt.Println(res)
 	}
 }
 
+
 func main() {
 	formatAndPrintKB()            // 100KB 1024 102400
 	formatAndPrintMiB()           // 1MiB 1048576 1048576
 	MustCompileMiWithError()      // unsupported data size format
 	validateMeasureAndPrint()     // false
-	TurnBytesIntoToSizeAndPrint() // 2.5960000000EB
+	TurnBytesIntoSizeAndPrint() // 2.5960000000EB
 }
 ```
 
