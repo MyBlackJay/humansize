@@ -20,7 +20,7 @@ var defaultMeasure = []string{"B", "KB", "MB", "GB", "TB", "PB", "EB"}
 type ReadableSize struct {
 	input    string
 	measure  int64
-	compiled *big.Int
+	compiled *big.Float
 }
 
 // GetInput returns original data size expression.
@@ -33,15 +33,36 @@ func (rs *ReadableSize) GetMeasure() int64 {
 	return rs.measure
 }
 
+// GetRaw returns the compiled data size.
+func (rs *ReadableSize) GetRaw() big.Float {
+	return *rs.compiled
+}
+
 // Get returns the compiled data size in big.Int.
 func (rs *ReadableSize) Get() big.Int {
-	return *rs.compiled
+	res, _ := rs.compiled.Int(new(big.Int))
+	return *res
 }
 
 // GetCompiledUInt64 returns the compiled data size in uint64.
 // Warning: Possible rounding overflow, use with relatively small numbers.
 func (rs *ReadableSize) GetCompiledUInt64() uint64 {
-	return rs.compiled.Uint64()
+	res, _ := rs.compiled.Uint64()
+	return res
+}
+
+// GetCompiledInMeasure returns the compiled data size in a specific dimension.
+// See the constant for the allowed options.
+// WARNING: Due to the nature of rounding of floating point numbers, values may have slight deviations.
+func (rs *ReadableSize) GetCompiledInMeasure(measure string) (float64, error) {
+	parser := regexp.MustCompile(measurePattern)
+	if matches := parser.FindStringSubmatch(measure); len(matches) == 2 {
+		tmp, _ := big.NewFloat(0).Quo(rs.compiled, big.NewFloat(float64(compileMeasuring(matches[1])))).Float64()
+
+		return tmp, nil
+	}
+
+	return 0, errors.New("unsupported measure format")
 }
 
 // compileMeasuring returns a numeric representation of a data unit in int64.
@@ -79,7 +100,7 @@ func Compile(input string) (*ReadableSize, error) {
 	if matches := parser.FindStringSubmatch(input); len(matches) == 3 {
 		if sz, err := strconv.ParseFloat(matches[1], 64); err == nil {
 			measure := compileMeasuring(matches[2])
-			result, _ := big.NewFloat(sz).Mul(big.NewFloat(sz), big.NewFloat(float64(measure))).Int(new(big.Int))
+			result := big.NewFloat(sz).Mul(big.NewFloat(sz), big.NewFloat(float64(measure)))
 
 			return &ReadableSize{
 				input:    input,
