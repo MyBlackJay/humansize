@@ -9,6 +9,13 @@ import (
 	"strings"
 )
 
+// available errors
+var (
+	UnsupportedFormat = errors.New("unsupported data size format")
+	UnexpectedError   = errors.New("unable convert")
+)
+
+// regexp parsing string expression
 const (
 	measurePattern string = `^([bB]|[bB]ytes|[kmgtpeKMGTPE]|[kmgtpeKMGTPE]?[iI]|[kmgtpeKMGTPE][iI]?[bB])?$`
 	sizePattern    string = `^([0-9]+|[0-9]*\.[0-9]+)([bB]|[bB]ytes|[kmgtpeKMGTPE]|[kmgtpeKMGTPE]?[iI]|[kmgtpeKMGTPE][iI]?[bB])?$`
@@ -40,6 +47,10 @@ func (rs *ReadableSize) GetRaw() big.Float {
 
 // Get returns the compiled data size in big.Int.
 func (rs *ReadableSize) Get() big.Int {
+	if rs.compiled == nil {
+		return *big.NewInt(0)
+	}
+
 	res, _ := rs.compiled.Int(new(big.Int))
 	return *res
 }
@@ -47,6 +58,10 @@ func (rs *ReadableSize) Get() big.Int {
 // GetCompiledUInt64 returns the compiled data size in uint64.
 // Warning: Possible rounding overflow, use with relatively small numbers.
 func (rs *ReadableSize) GetCompiledUInt64() uint64 {
+	if rs.compiled == nil {
+		return 0
+	}
+
 	res, _ := rs.compiled.Uint64()
 	return res
 }
@@ -62,7 +77,56 @@ func (rs *ReadableSize) GetCompiledInMeasure(measure string) (float64, error) {
 		return tmp, nil
 	}
 
-	return 0, errors.New("unsupported measure format")
+	return 0, UnsupportedFormat
+}
+
+// UnmarshalJSON designed to serialize a string in data size expression to *ReadableSize, defined in user code via the json library
+func (rs *ReadableSize) UnmarshalJSON(source []byte) error {
+	value := string(source)
+
+	if len(value) < 2 {
+		return UnsupportedFormat
+	}
+
+	if value == "null" {
+		return nil
+	}
+
+	if parsed, err := Compile(value[1 : len(value)-1]); err == nil {
+		*rs = *parsed
+		return nil
+	} else {
+		return err
+	}
+}
+
+// MarshalJSON designed to deserialize *ReadableSize to original data size expression defined in user code via the json library
+func (rs ReadableSize) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + rs.input + "\""), nil
+}
+
+// UnmarshalYAML designed to serialize a string in data size expression to *ReadableSize, defined in user code via the gopkg.in/yaml.v3 library
+func (rs *ReadableSize) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var str string
+	if err := unmarshal(&str); err != nil {
+		return UnsupportedFormat
+	}
+
+	if str == "null" {
+		return nil
+	}
+
+	if parsed, err := Compile(str); err == nil {
+		*rs = *parsed
+		return nil
+	} else {
+		return err
+	}
+}
+
+// MarshalYAML designed to deserialize *ReadableSize in original data size expression defined in user code via the gopkg.in/yaml.v3 library
+func (rs ReadableSize) MarshalYAML() (interface{}, error) {
+	return rs.input, nil
 }
 
 // compileMeasuring returns a numeric representation of a data unit in int64.
@@ -110,7 +174,7 @@ func Compile(input string) (*ReadableSize, error) {
 		}
 	}
 
-	return nil, errors.New("unsupported data size format")
+	return nil, UnsupportedFormat
 }
 
 // MustCompile parses a data size expression and returns, if successful,
@@ -154,5 +218,5 @@ func BytesToSize(size float64, precision uint) (string, error) {
 		size /= 1 << 10
 	}
 
-	return "", errors.New("unable convert")
+	return "", UnexpectedError
 }
